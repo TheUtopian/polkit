@@ -19,10 +19,6 @@
  * Author: David Zeuthen <davidz@redhat.com>
  */
 
-#ifdef HAVE_CONFIG_H
-#  include "config.h"
-#endif
-
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -35,6 +31,11 @@
 
 #ifdef __linux__
 #include <sys/prctl.h>
+#endif
+
+#ifdef __FreeBSD__
+#include <signal.h>
+#include <sys/procctl.h>
 #endif
 
 #include <glib/gi18n.h>
@@ -85,6 +86,7 @@ usage (int argc, char *argv[])
 
 /* ---------------------------------------------------------------------------------------------------- */
 
+G_GNUC_PRINTF(3, 4)
 static void
 log_message (gint     level,
              gboolean print_to_stderr,
@@ -201,7 +203,7 @@ open_session (const gchar *user_to_auth,
       for (n = 0; envlist[n]; n++)
 	{
 	  const char *envitem = envlist[n];
-	  
+
 	  if (g_str_has_prefix (envitem, "XDG_RUNTIME_DIR="))
 	    {
 	      const char *eq = strchr (envitem, '=');
@@ -367,7 +369,7 @@ is_valid_shell (const gchar *shell)
   shells = g_strsplit (contents, "\n", 0);
   for (n = 0; shells != NULL && shells[n] != NULL; n++)
     {
-      if (g_strcmp0 (shell, shells[n]) == 0)
+      if (shells[n][0] == '/' && g_strcmp0 (shell, shells[n]) == 0)
         {
           ret = TRUE;
           goto out;
@@ -517,7 +519,7 @@ main (int argc, char *argv[])
   setenv ("GIO_USE_VFS", "local", 1);
 
   /* First process options and find the command-line to invoke. Avoid using fancy library routines
-   * that depend on environtment variables since we haven't cleared the environment just yet.
+   * that depend on environment variables since we haven't cleared the environment just yet.
    */
   opt_show_help = FALSE;
   opt_show_version = FALSE;
@@ -731,10 +733,17 @@ main (int argc, char *argv[])
     }
 
   /* make sure we are nuked if the parent process dies */
-#ifdef __linux__
+#if defined(__linux__)
   if (prctl (PR_SET_PDEATHSIG, SIGTERM) != 0)
     {
       g_printerr ("prctl(PR_SET_PDEATHSIG, SIGTERM) failed: %s\n", g_strerror (errno));
+      goto out;
+    }
+#elif defined(__FreeBSD__)
+  int _sig = SIGTERM;
+  if (procctl (P_PID, 0, PROC_PDEATHSIG_CTL, &_sig) != 0)
+    {
+      g_printerr ("procctl(2) failed: %s\n", g_strerror (errno));
       goto out;
     }
 #else
@@ -805,6 +814,11 @@ main (int argc, char *argv[])
   polkit_details_insert (details, "command_line", command_line);
 
   cmdline_short = g_strdup(command_line);
+  if (cmdline_short == NULL)
+    {
+      g_printerr ("Failed to allocate memory for shortened command line.\n");
+      goto out;
+    }
   if (strlen(command_line) > 80)
       g_stpcpy(g_stpcpy( cmdline_short + 38, " ... " ),
                command_line + strlen(command_line) - 37 );
@@ -959,7 +973,7 @@ main (int argc, char *argv[])
   /* if not changing to uid 0, become uid 0 before changing to the user */
   if (pw->pw_uid != 0)
     {
-      setreuid (0, 0);
+      (void) setreuid (0, 0);
       if ((geteuid () != 0) || (getuid () != 0))
         {
           g_printerr ("Error becoming uid 0: %s\n", g_strerror (errno));
@@ -1012,8 +1026,8 @@ main (int argc, char *argv[])
       g_printerr ("Error initializing groups for %s: %s\n", pw->pw_name, g_strerror (errno));
       goto out;
     }
-  setregid (pw->pw_gid, pw->pw_gid);
-  setreuid (pw->pw_uid, pw->pw_uid);
+  (void) setregid (pw->pw_gid, pw->pw_gid);
+  (void) setreuid (pw->pw_uid, pw->pw_uid);
   if ((geteuid () != pw->pw_uid) || (getuid () != pw->pw_uid) ||
       (getegid () != pw->pw_gid) || (getgid () != pw->pw_gid))
     {
@@ -1023,7 +1037,7 @@ main (int argc, char *argv[])
 
   /* change to home directory */
   if (!opt_keep_cwd)
-    {  
+    {
       if (chdir (pw->pw_dir) != 0)
         {
           g_printerr ("Error changing to home directory %s: %s\n", pw->pw_dir, g_strerror (errno));

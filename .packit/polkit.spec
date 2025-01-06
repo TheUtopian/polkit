@@ -3,8 +3,8 @@
 #
 Summary: An authorization framework
 Name: polkit
-Version: 124
-Release: 2%{?dist}
+Version: 126
+Release: 1%{?dist}
 License: LGPL-2.0-or-later
 URL: https://github.com/polkit-org/polkit
 Source0: https://github.com/polkit-org/polkit/archive/refs/tags/%{version}.tar.gz
@@ -23,6 +23,8 @@ BuildRequires: dbus-devel
 BuildRequires: pkgconfig(duktape)
 BuildRequires: meson
 BuildRequires: git
+BuildRequires: python3-dbus
+BuildRequires: python3-dbusmock
 
 Requires: dbus, polkit-pkla-compat
 Requires: %{name}-libs%{?_isa} = %{version}-%{release}
@@ -87,10 +89,11 @@ Libraries files for polkit.
        -D gtk_doc=true \
        -D introspection=true \
        -D man=true \
-       -D session_tracking=libsystemd-login \
-       -D tests=false
+       -D session_tracking=logind \
+       -D tests=true
 
 %meson_build
+%meson_test
 
 %install
 %meson_install
@@ -137,6 +140,7 @@ rm -f $RPM_BUILD_ROOT%{_libdir}/*.la
 %{_bindir}/pkttyagent
 %dir %{_prefix}/lib/polkit-1
 %{_prefix}/lib/polkit-1/polkitd
+%{_tmpfilesdir}/polkit-tmpfiles.conf
 
 # see upstream docs for why these permissions are necessary
 %attr(4755,root,root) %{_bindir}/pkexec

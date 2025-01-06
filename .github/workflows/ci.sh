@@ -3,15 +3,7 @@ set -eux
 set -o pipefail
 
 # TODO
-#   - enable --werror
-#       - currently there's a lot of warnings which need to be taken care of first
-#   - re-enable test-polkitbackendjsauthority
-#       - mocklibc overrides LD_PRELOAD, causing ASan to report false positives
-#         (with asan_verify_no_link=0)
-#   - re-enable unit tests built with ASan + sanitizers
-#       - currently polkit fails to build with clang >= 17 completely, and
-#         with older clang it needs to be built with -shared-libasan, which
-#         requires another set of tweaks to the environment
+#   - drop -Wno-deprecated-declarations
 
 PHASE="${1:?}"
 COMMON_BUILD_OPTS=(
@@ -19,7 +11,7 @@ COMMON_BUILD_OPTS=(
     -Dexamples=true
     -Dgtk_doc=true
     -Dintrospection=true
-    -Dsession_tracking=libsystemd-login
+    -Dsession_tracking=logind
     -Dtests=true
 )
 
@@ -40,9 +32,17 @@ case "$PHASE" in
         )
 
         for opt in "${BUILD_TEST_FLAGS[@]}"; do
+            COMPILER_FLAGS=(-Wno-deprecated-declarations)
+
+            if [[ "$opt" != --optimization=0 ]]; then
+                COMPILER_FLAGS+=(-D_FORTIFY_SOURCE=2)
+            fi
+
             meson setup build \
                 -Dman=true \
-                -Dcpp_args="-D_FORTIFY_SOURCE=2" \
+                --werror \
+                -Dc_args="${COMPILER_FLAGS[*]}" \
+                -Dcpp_args="${COMPILER_FLAGS[*]}" \
                 "${COMMON_BUILD_OPTS[@]}" \
                 "$opt"
             meson compile -C build -v
@@ -55,6 +55,7 @@ case "$PHASE" in
 
         meson setup build \
             -Dman=true \
+            -Dc_args="-D_FORTIFY_SOURCE=2" \
             -Dcpp_args="-D_FORTIFY_SOURCE=2" \
             "${COMMON_BUILD_OPTS[@]}"
 
@@ -73,8 +74,7 @@ case "$PHASE" in
             -Db_lundef=false \
             "${COMMON_BUILD_OPTS[@]}"
 
-        # Note: we need to set verify_asan_link_order=0 as polkit LD_PRELOADs libmocklibc in unit tests
-        export ASAN_OPTIONS=strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:verify_asan_link_order=0
+        export ASAN_OPTIONS=strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1
         export UBSAN_OPTIONS=print_stacktrace=1:print_summary=1:halt_on_error=1
 
         meson compile -C build -v

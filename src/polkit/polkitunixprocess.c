@@ -19,10 +19,6 @@
  * Author: David Zeuthen <davidz@redhat.com>
  */
 
-#ifdef HAVE_CONFIG_H
-#  include "config.h"
-#endif
-
 #include <sys/types.h>
 #ifdef HAVE_FREEBSD
 #include <sys/param.h>
@@ -614,7 +610,7 @@ polkit_unix_process_get_pid (PolkitUnixProcess *process)
         return pid;
 
       g_error_free (error);
-      return -1;
+      return 0;
     }
 
   return process->pid;

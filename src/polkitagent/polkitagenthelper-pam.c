@@ -19,7 +19,6 @@
  * Author: David Zeuthen <davidz@redhat.com>
  */
 
-#include "config.h"
 #include "polkitagenthelperprivate.h"
 
 #include <stdio.h>
@@ -44,6 +43,7 @@ send_to_helper (const gchar *str1,
   size_t len2;
 
   tmp2 = g_strdup(str2);
+  g_assert (tmp2 != NULL);
   len2 = strlen(tmp2);
 #ifdef PAH_DEBUG
   fprintf (stderr, "polkit-agent-helper-1: writing `%s ' to stdout\n", str1);

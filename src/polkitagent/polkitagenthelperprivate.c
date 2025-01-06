@@ -20,7 +20,6 @@
  *          Andrew Psaltis <ampsaltis@gmail.com>
  */
 
-#include "config.h"
 #include "polkitagenthelperprivate.h"
 #include <stdio.h>
 #include <string.h>
@@ -130,7 +129,7 @@ send_dbus_message (const char *cookie, const char *user)
 }
 
 void
-flush_and_wait ()
+flush_and_wait (void)
 {
   fflush (stdout);
   fflush (stderr);

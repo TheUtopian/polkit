@@ -16,7 +16,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: registry.fedoraproject.org/fedora:latest
+    container:
+      image: registry.fedoraproject.org/fedora:latest
+      options: "--privileged"
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.phase }}
       cancel-in-progress: true
@@ -30,7 +32,7 @@ jobs:
 
       - name: Install build & test dependencies
         run: |
-          sudo dnf install -y dnf-plugins-core python3-dbusmock clang compiler-rt libasan libubsan
+          sudo dnf install -y dnf-plugins-core python3-dbusmock clang compiler-rt libasan libubsan mozjs115-devel
           sudo dnf builddep -y polkit
 
       - name: Build & test
